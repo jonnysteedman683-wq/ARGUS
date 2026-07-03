@@ -1,0 +1,19 @@
+# Production time-series store. For v1 dev you can skip this entirely and use
+# the default SQLite backend. To use TimescaleDB:
+#   docker compose up -d
+#   psql "$DATABASE_URL" -f argus/store/schema_timescale.sql
+#   export DATABASE_URL=postgresql://argus:argus@localhost:5432/argus
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: argus
+      POSTGRES_DB: argus
+    ports:
+      - "5432:5432"
+    volumes:
+      - argus_pgdata:/var/lib/postgresql/data
+
+volumes:
+  argus_pgdata:
