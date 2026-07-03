@@ -3,6 +3,7 @@
 Usage:
     argus init                       # create the store schema
     argus ingest <file.json>         # load observations/metrics from a JSON file
+    argus checkin "how my day went"  # ambient check-in: extract + curate (needs API key)
     argus chat "your message"        # one-shot chat with the twin (needs API key)
     argus repl                       # interactive chat loop
 """
@@ -30,6 +31,22 @@ def cmd_init() -> int:
 def cmd_ingest(path: str) -> int:
     counts = ingest(JSONFileAdapter(path), _repo())
     print(f"Ingested {counts['observations']} observations, {counts['metrics']} metrics.")
+    return 0
+
+
+def cmd_checkin(text: str) -> int:
+    from argus.curator import LLMExtractor, run_checkin
+
+    result = run_checkin(text, _repo(), LLMExtractor())
+    print(
+        f"Curated: +{result.observations_written} observations "
+        f"({result.observations_skipped} deduped), "
+        f"+{result.metrics_written} metrics, +{result.preferences_written} preferences."
+    )
+    for c in result.preference_changes:
+        print(f"  drift: {c['topic']} {c['from']!r} -> {c['to']!r}")
+    if result.summary:
+        print(f"  summary: {result.summary}")
     return 0
 
 
@@ -67,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init()
     if cmd == "ingest" and rest:
         return cmd_ingest(rest[0])
+    if cmd == "checkin" and rest:
+        return cmd_checkin(" ".join(rest))
     if cmd == "chat" and rest:
         return cmd_chat(" ".join(rest))
     if cmd == "repl":

@@ -95,6 +95,15 @@ class Repository:
         args.append(limit)
         return [self._row_to_obs(r) for r in self._conn.execute(q, args)]
 
+    def observation_exists(self, text: str, *, since: datetime | None = None) -> bool:
+        """Exact-text dedupe check within an optional recent window."""
+        q = "SELECT 1 FROM observations WHERE text = ?"
+        args: list[Any] = [text]
+        if since is not None:
+            q += " AND ts >= ?"
+            args.append(_iso(since))
+        return self._conn.execute(q + " LIMIT 1", args).fetchone() is not None
+
     def search_observations(
         self, query: str, *, limit: int = 20, as_of: datetime | None = None
     ) -> list[Observation]:

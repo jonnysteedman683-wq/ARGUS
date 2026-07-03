@@ -38,8 +38,9 @@ argus/
   models.py            # Observation, Metric, ProfileFact, Preference
   store/               # db.py, schema_*.sql, repository.py (as-of read API)
   ingestion/           # base.py (Adapter), manual.py (JSON file)
+  curator/             # ambient check-in: schema.py, extract.py (LLM), curate.py
   agent/               # tools.py (Toolbox), prompt.py, loop.py (tool runner)
-  cli.py               # init / ingest / chat / repl
+  cli.py               # init / ingest / checkin / chat / repl
 tests/                 # repository as-of + tool logic
 seed/example.json      # sample data
 ```
@@ -53,9 +54,14 @@ pip install -e ".[dev]"
 python -m argus.cli init
 python -m argus.cli ingest seed/example.json
 
-# 2. Chat with the twin (requires ANTHROPIC_API_KEY)
+# 2. Ambient check-in — free text in, structured memory out (requires ANTHROPIC_API_KEY)
 export ANTHROPIC_API_KEY=sk-...
 export ARGUS_TWIN_NAME="Jonny"
+python -m argus.cli checkin "Rough day — barely slept, skipped the gym again, \
+but that vendor call went well. Booked three more meetings even though I keep \
+saying I want fewer."
+
+# 3. Chat with the twin
 python -m argus.cli chat "How was my sleep this month, and any red flags?"
 
 # Run tests (no API key or Docker needed)
@@ -64,10 +70,16 @@ pytest -q
 
 ## Roadmap
 
-- **v1 (this skeleton):** store + as-of queries, JSON ingestion, agent tool loop, CLI, tests.
-- **Next:** a real ingestion adapter (calendar / health export), richer forecasting,
-  semantic recall over observations, the confirm-and-execute path for `draft_action`,
-  and the TimescaleDB backend wired behind the same Repository API.
+- **Done:** store + as-of queries; JSON ingestion; a rich preference engine
+  (stated vs. revealed, value/preference/habit tiers with decay, contextual
+  resolution, contradiction-as-event, divergence); the **curator loop** (ambient
+  check-in → LLM extraction → autonomous, deduped, contradiction-aware writes);
+  agent tool loop; CLI; tests.
+- **Next:** proactive nudges (a scheduled check-in that watches the time-series
+  and surfaces divergences/anomalies on its own), memory consolidation
+  (raw→episodic→semantic), a real ingestion adapter (calendar / health export),
+  the confirm-and-execute path for `draft_action`, and the TimescaleDB backend
+  behind the same Repository API.
 
 ## Status
 
