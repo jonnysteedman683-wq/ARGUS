@@ -17,10 +17,15 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# Default half-life (days) for preference-strength decay, keyed by preference
-# kind. Values move slowly; habits/behaviour decay faster. A preference not
-# reinforced for one half-life is worth half its stored strength.
-DECAY_HALF_LIFE_DAYS: dict[str, float] = {"stated": 180.0, "revealed": 90.0}
+# Default half-life (days) for preference-strength decay, keyed by tier.
+# Values are near-identity (slow drift); mid-level preferences fade over months;
+# habits are the most volatile. A preference not reinforced for one half-life is
+# worth half its stored strength.
+DECAY_HALF_LIFE_DAYS: dict[str, float] = {
+    "value": 1825.0,       # ~5 years
+    "preference": 180.0,   # ~6 months
+    "habit": 60.0,         # ~2 months
+}
 
 
 class Observation(BaseModel):
@@ -65,6 +70,9 @@ class Preference(BaseModel):
     topic: str
     stance: str
     kind: Literal["stated", "revealed"] = "stated"
+    # tier orders durability: a value outranks a preference outranks a habit
+    # when they conflict, and decays far more slowly.
+    tier: Literal["value", "preference", "habit"] = "preference"
     context: str | None = None
     strength: float = 0.5  # 0..1, at time of `updated_at`; decays afterwards
     confidence: float = 1.0
@@ -80,7 +88,7 @@ class Preference(BaseModel):
         if ref.tzinfo is None:
             ref = ref.replace(tzinfo=timezone.utc)
         days = max((at - ref).total_seconds() / 86400.0, 0.0)
-        half_life = DECAY_HALF_LIFE_DAYS.get(self.kind, 180.0)
+        half_life = DECAY_HALF_LIFE_DAYS.get(self.tier, 180.0)
         return self.strength * (0.5 ** (days / half_life))
 
 

@@ -68,8 +68,37 @@ def test_contradiction_is_logged_not_overwritten():
 
 
 def test_preference_strength_decays_over_time():
-    tb = _seed()  # stated pref set at 2026-06-01 with strength 0.8, half-life 180d
+    tb = _seed()  # stated pref set at 2026-06-01 with strength 0.8, tier default
     now = tb.list_preferences(kind="stated", as_of=_dt(1).isoformat())[0]
     later = tb.list_preferences(kind="stated", as_of="2026-12-01T12:00:00Z")[0]
     assert now["effective_strength"] == 0.8
     assert later["effective_strength"] < 0.8  # ~half-life elapsed
+
+
+def test_value_tier_decays_slower_than_habit():
+    tb = _seed()
+    tb.set_preference("autonomy", "matters a lot", tier="value", strength=0.9)
+    tb.set_preference("email-first", "checks inbox first", tier="habit", strength=0.9)
+    a_year = "2027-06-01T12:00:00Z"
+    value = next(p for p in tb.list_preferences(as_of=a_year) if p["topic"] == "autonomy")
+    habit = next(p for p in tb.list_preferences(as_of=a_year) if p["topic"] == "email-first")
+    assert value["effective_strength"] > habit["effective_strength"]
+
+
+def test_contextual_preference_wins_over_global():
+    tb = _seed()
+    tb.set_preference("tone", "warm", context=None)          # global
+    tb.set_preference("tone", "terse", context="slack")      # specific
+    in_slack = tb.resolve_preference("tone", context="slack")
+    elsewhere = tb.resolve_preference("tone", context="email")
+    assert in_slack["stance"] == "terse" and in_slack["basis"] == "context-specific"
+    assert elsewhere["stance"] == "warm" and elsewhere["basis"] == "global"
+
+
+def test_divergence_is_context_scoped():
+    tb = _seed()
+    tb.set_preference("meetings", "prefer async", kind="stated", context="1on1")
+    tb.set_preference("meetings", "always books a call", kind="revealed", context="1on1")
+    d = tb.divergence("meetings", context="1on1")
+    assert d["aligned"] is False
+    assert d["context"] == "1on1"

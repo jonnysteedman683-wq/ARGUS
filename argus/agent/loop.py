@@ -78,7 +78,8 @@ class TwinAgent:
 
         @beta_tool
         def set_preference(
-            topic: str, stance: str, kind: str = "stated", context: str | None = None,
+            topic: str, stance: str, kind: str = "stated", tier: str = "preference",
+            context: str | None = None,
         ) -> dict:
             """Record a preference. Use kind='stated' for what the person says they
             prefer, kind='revealed' for what their behaviour implies.
@@ -87,9 +88,11 @@ class TwinAgent:
                 topic: What the preference is about, e.g. "meetings".
                 stance: The preference, e.g. "prefer async".
                 kind: "stated" or "revealed".
+                tier: Durability: "value" (deep, slow-changing), "preference"
+                    (default), or "habit" (behavioural, volatile).
                 context: Optional scope, e.g. "design_review", "weekday".
             """
-            return tb.set_preference(topic, stance, kind=kind, context=context)
+            return tb.set_preference(topic, stance, kind=kind, tier=tier, context=context)
 
         @beta_tool
         def list_preferences(kind: str | None = None, as_of: str | None = None) -> list:
@@ -102,15 +105,32 @@ class TwinAgent:
             return tb.list_preferences(kind=kind, as_of=as_of)
 
         @beta_tool
-        def divergence(topic: str, as_of: str | None = None) -> dict:
-            """Compare stated vs revealed preference for a topic — the gap between
-            what the person says and what they do.
+        def resolve_preference(
+            topic: str, context: str | None = None, kind: str = "stated",
+            as_of: str | None = None,
+        ) -> dict:
+            """Answer "what's my preference here?" — the single winning preference
+            for a topic in a context, after specificity, tier, decay, and recency.
+
+            Args:
+                topic: The preference topic.
+                context: Optional scope to resolve within, e.g. "slack".
+                kind: "stated" or "revealed".
+                as_of: Optional ISO-8601 timestamp bound.
+            """
+            return tb.resolve_preference(topic, context=context, kind=kind, as_of=as_of)
+
+        @beta_tool
+        def divergence(topic: str, context: str | None = None, as_of: str | None = None) -> dict:
+            """Compare stated vs revealed preference for a topic (optionally within a
+            context) — the gap between what the person says and what they do.
 
             Args:
                 topic: The preference topic to compare.
+                context: Optional scope to compare within.
                 as_of: Optional ISO-8601 timestamp bound.
             """
-            return tb.divergence(topic, as_of=as_of)
+            return tb.divergence(topic, context=context, as_of=as_of)
 
         @beta_tool
         def forecast(metric: str, horizon_days: int = 7) -> dict:
@@ -144,8 +164,8 @@ class TwinAgent:
 
         return [
             query_state, get_profile, search_observations, query_timeseries,
-            record_observation, set_preference, list_preferences, divergence,
-            forecast, detect_anomalies, draft_action,
+            record_observation, set_preference, list_preferences, resolve_preference,
+            divergence, forecast, detect_anomalies, draft_action,
         ]
 
     def ask(self, message: str) -> str:

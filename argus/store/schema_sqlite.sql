@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS preferences (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     topic      TEXT NOT NULL,
     stance     TEXT NOT NULL,
-    kind       TEXT NOT NULL DEFAULT 'stated',   -- 'stated' | 'revealed'
+    kind       TEXT NOT NULL DEFAULT 'stated',        -- 'stated' | 'revealed'
+    tier       TEXT NOT NULL DEFAULT 'preference',    -- 'value' | 'preference' | 'habit'
     context    TEXT,
     strength   REAL NOT NULL DEFAULT 0.5,
     confidence REAL NOT NULL DEFAULT 1.0,

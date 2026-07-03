@@ -33,7 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_profile_key_ts ON profile_history (key, updated_a
 CREATE TABLE IF NOT EXISTS preferences (
     topic      TEXT        NOT NULL,
     stance     TEXT        NOT NULL,
-    kind       TEXT        NOT NULL DEFAULT 'stated',   -- 'stated' | 'revealed'
+    kind       TEXT        NOT NULL DEFAULT 'stated',        -- 'stated' | 'revealed'
+    tier       TEXT        NOT NULL DEFAULT 'preference',    -- 'value' | 'preference' | 'habit'
     context    TEXT,
     strength   DOUBLE PRECISION NOT NULL DEFAULT 0.5,
     confidence DOUBLE PRECISION NOT NULL DEFAULT 1.0,

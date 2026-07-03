@@ -74,9 +74,9 @@ class Repository:
             )
         self._conn.execute(
             "INSERT INTO preferences "
-            "(topic, stance, kind, context, strength, confidence, source, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (pref.topic, pref.stance, pref.kind, pref.context, pref.strength,
+            "(topic, stance, kind, tier, context, strength, confidence, source, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (pref.topic, pref.stance, pref.kind, pref.tier, pref.context, pref.strength,
              pref.confidence, pref.source, _iso(pref.updated_at)),
         )
         self._conn.commit()
@@ -186,12 +186,36 @@ class Repository:
             for r in self._conn.execute(q, args)
         ]
 
+    def resolve_preference(
+        self, topic: str, *, context: str | None = None, kind: str = "stated",
+        as_of: datetime | None = None,
+    ) -> Preference | None:
+        """The single winning preference for a topic in a context.
+
+        Among applicable preferences (an exact context match, or a global one
+        with no context), pick by specificity first, then tier durability, then
+        decayed strength, then recency. This answers "what would apply here".
+        """
+        tier_rank = {"value": 3, "preference": 2, "habit": 1}
+        candidates = [
+            p for p in self.get_preferences(as_of=as_of, kind=kind)
+            if p.topic == topic and (p.context is None or p.context == context)
+        ]
+        if not candidates:
+            return None
+
+        def score(p: Preference) -> tuple:
+            specificity = 1 if (context is not None and p.context == context) else 0
+            return (specificity, tier_rank.get(p.tier, 2), p.effective_strength(as_of), p.updated_at)
+
+        return max(candidates, key=score)
+
     @staticmethod
     def _row_to_pref(r: sqlite3.Row) -> Preference:
         return Preference(
-            topic=r["topic"], stance=r["stance"], kind=r["kind"], context=r["context"],
-            strength=r["strength"], confidence=r["confidence"], source=r["source"],
-            updated_at=datetime.fromisoformat(r["updated_at"]),
+            topic=r["topic"], stance=r["stance"], kind=r["kind"], tier=r["tier"],
+            context=r["context"], strength=r["strength"], confidence=r["confidence"],
+            source=r["source"], updated_at=datetime.fromisoformat(r["updated_at"]),
         )
 
     # --- row mappers ----------------------------------------------------

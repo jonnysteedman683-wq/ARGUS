@@ -76,20 +76,43 @@ class Toolbox:
 
     # --- preferences ----------------------------------------------------
     def set_preference(
-        self, topic: str, stance: str, kind: str = "stated", context: str | None = None,
-        strength: float = 0.6, source: str = "conversation", reason: str | None = None,
+        self, topic: str, stance: str, kind: str = "stated", tier: str = "preference",
+        context: str | None = None, strength: float = 0.6, source: str = "conversation",
+        reason: str | None = None,
     ) -> dict[str, Any]:
-        """Record a stated or revealed preference. Logs a change if it contradicts
-        the current stance for the same (topic, context, kind)."""
+        """Record a stated or revealed preference. `tier` is value|preference|habit
+        (durability). Logs a change if it contradicts the current stance for the
+        same (topic, context, kind)."""
         change = self.repo.set_preference(
-            Preference(topic=topic, stance=stance, kind=kind, context=context,
+            Preference(topic=topic, stance=stance, kind=kind, tier=tier, context=context,
                        strength=strength, source=source),
             reason=reason,
         )
         return {
             "status": "recorded",
-            "preference": {"topic": topic, "stance": stance, "kind": kind, "context": context},
+            "preference": {"topic": topic, "stance": stance, "kind": kind,
+                           "tier": tier, "context": context},
             "changed_from": change.old_stance if change else None,
+        }
+
+    def resolve_preference(
+        self, topic: str, context: str | None = None, kind: str = "stated",
+        as_of: str | None = None,
+    ) -> dict[str, Any]:
+        """Answer 'what's my preference here?' — the winning preference for a topic
+        in a context, after applying specificity, tier, decay, and recency."""
+        at = _parse_ts(as_of)
+        p = self.repo.resolve_preference(topic, context=context, kind=kind, as_of=at)
+        if p is None:
+            return {"topic": topic, "context": context, "status": "no_preference"}
+        return {
+            "topic": topic,
+            "context": context,
+            "stance": p.stance,
+            "tier": p.tier,
+            "matched_context": p.context,
+            "basis": "context-specific" if p.context == context and context is not None else "global",
+            "effective_strength": round(p.effective_strength(at or datetime.now(timezone.utc)), 4),
         }
 
     def list_preferences(
@@ -100,24 +123,24 @@ class Toolbox:
         prefs = self.repo.get_preferences(as_of=_parse_ts(as_of), kind=kind, context=context)
         return [_pref_view(p, at) for p in prefs]
 
-    def divergence(self, topic: str, as_of: str | None = None) -> dict[str, Any]:
-        """Compare what the person SAYS they prefer vs what their behaviour REVEALS.
-
-        The gap between stated and revealed preference is the twin's strongest
-        signal for predicting what the person will actually do.
+    def divergence(
+        self, topic: str, context: str | None = None, as_of: str | None = None
+    ) -> dict[str, Any]:
+        """Compare what the person SAYS vs what their behaviour REVEALS, within an
+        optional context. The gap is the twin's strongest signal for predicting
+        what the person will actually do.
         """
         at = _parse_ts(as_of)
         at_dt = at or datetime.now(timezone.utc)
-        stated = self.repo.get_preferences(as_of=at, kind="stated", context=None)
-        revealed = self.repo.get_preferences(as_of=at, kind="revealed", context=None)
-        s = next((p for p in stated if p.topic == topic), None)
-        r = next((p for p in revealed if p.topic == topic), None)
+        s = self.repo.resolve_preference(topic, context=context, kind="stated", as_of=at)
+        r = self.repo.resolve_preference(topic, context=context, kind="revealed", as_of=at)
         if s is None or r is None:
-            return {"topic": topic, "status": "insufficient_data",
+            return {"topic": topic, "context": context, "status": "insufficient_data",
                     "stated": s.stance if s else None, "revealed": r.stance if r else None}
         aligned = s.stance == r.stance
         return {
             "topic": topic,
+            "context": context,
             "aligned": aligned,
             "stated": {"stance": s.stance, "strength": round(s.effective_strength(at_dt), 4)},
             "revealed": {"stance": r.stance, "strength": round(r.effective_strength(at_dt), 4)},
