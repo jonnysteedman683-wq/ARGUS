@@ -34,11 +34,30 @@ CREATE TABLE IF NOT EXISTS profile_history (
 );
 CREATE INDEX IF NOT EXISTS idx_profile_key_ts ON profile_history (key, updated_at);
 
+-- Preferences are append-only history too; the current preference is the latest
+-- row per (topic, context, kind). `strength` is decayed at read time.
 CREATE TABLE IF NOT EXISTS preferences (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     topic      TEXT NOT NULL,
     stance     TEXT NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'stated',   -- 'stated' | 'revealed'
+    context    TEXT,
     strength   REAL NOT NULL DEFAULT 0.5,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    source     TEXT NOT NULL DEFAULT 'conversation',
     updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_pref_topic_ts ON preferences (topic, updated_at);
+CREATE INDEX IF NOT EXISTS idx_pref_topic_ts ON preferences (topic, kind, updated_at);
+
+-- Contradiction log: how the person's preferences have drifted over time.
+CREATE TABLE IF NOT EXISTS preference_changes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic      TEXT NOT NULL,
+    context    TEXT,
+    kind       TEXT NOT NULL DEFAULT 'stated',
+    old_stance TEXT NOT NULL,
+    new_stance TEXT NOT NULL,
+    reason     TEXT,
+    ts         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pref_change_topic_ts ON preference_changes (topic, ts);

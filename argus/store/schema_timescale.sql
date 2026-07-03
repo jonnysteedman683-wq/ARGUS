@@ -33,7 +33,22 @@ CREATE INDEX IF NOT EXISTS idx_profile_key_ts ON profile_history (key, updated_a
 CREATE TABLE IF NOT EXISTS preferences (
     topic      TEXT        NOT NULL,
     stance     TEXT        NOT NULL,
+    kind       TEXT        NOT NULL DEFAULT 'stated',   -- 'stated' | 'revealed'
+    context    TEXT,
     strength   DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+    confidence DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    source     TEXT        NOT NULL DEFAULT 'conversation',
     updated_at TIMESTAMPTZ NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_pref_topic_ts ON preferences (topic, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pref_topic_ts ON preferences (topic, kind, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS preference_changes (
+    topic      TEXT        NOT NULL,
+    context    TEXT,
+    kind       TEXT        NOT NULL DEFAULT 'stated',
+    old_stance TEXT        NOT NULL,
+    new_stance TEXT        NOT NULL,
+    reason     TEXT,
+    ts         TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pref_change_topic_ts ON preference_changes (topic, ts DESC);

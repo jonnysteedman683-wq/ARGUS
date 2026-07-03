@@ -11,8 +11,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from argus.models import Observation
+from argus.models import Observation, Preference
 from argus.store import Repository
+
+
+def _pref_view(pref: Preference, at: datetime) -> dict[str, Any]:
+    d = pref.model_dump(mode="json")
+    d["effective_strength"] = round(pref.effective_strength(at), 4)
+    return d
 
 
 def _parse_ts(value: str | None) -> datetime | None:
@@ -29,10 +35,11 @@ class Toolbox:
     def query_state(self, as_of: str | None = None, recent: int = 10) -> dict[str, Any]:
         """Assemble the twin snapshot (profile + preferences + recent context)."""
         at = _parse_ts(as_of)
+        at_dt = at or datetime.now(timezone.utc)
         return {
-            "as_of": (at or datetime.now(timezone.utc)).isoformat(),
+            "as_of": at_dt.isoformat(),
             "profile": self.repo.get_profile(as_of=at),
-            "preferences": [p.model_dump(mode="json") for p in self.repo.get_preferences(as_of=at)],
+            "preferences": [_pref_view(p, at_dt) for p in self.repo.get_preferences(as_of=at)],
             "recent_observations": [
                 o.model_dump(mode="json") for o in self.repo.recent_observations(limit=recent, as_of=at)
             ],
@@ -66,6 +73,62 @@ class Toolbox:
         """Persist something newly learned about the person during a conversation."""
         self.repo.add_observation(Observation(source=source, kind=kind, text=text))
         return {"status": "recorded", "text": text}
+
+    # --- preferences ----------------------------------------------------
+    def set_preference(
+        self, topic: str, stance: str, kind: str = "stated", context: str | None = None,
+        strength: float = 0.6, source: str = "conversation", reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Record a stated or revealed preference. Logs a change if it contradicts
+        the current stance for the same (topic, context, kind)."""
+        change = self.repo.set_preference(
+            Preference(topic=topic, stance=stance, kind=kind, context=context,
+                       strength=strength, source=source),
+            reason=reason,
+        )
+        return {
+            "status": "recorded",
+            "preference": {"topic": topic, "stance": stance, "kind": kind, "context": context},
+            "changed_from": change.old_stance if change else None,
+        }
+
+    def list_preferences(
+        self, kind: str | None = None, context: str | None = None, as_of: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List current preferences with time-decayed effective strength."""
+        at = _parse_ts(as_of) or datetime.now(timezone.utc)
+        prefs = self.repo.get_preferences(as_of=_parse_ts(as_of), kind=kind, context=context)
+        return [_pref_view(p, at) for p in prefs]
+
+    def divergence(self, topic: str, as_of: str | None = None) -> dict[str, Any]:
+        """Compare what the person SAYS they prefer vs what their behaviour REVEALS.
+
+        The gap between stated and revealed preference is the twin's strongest
+        signal for predicting what the person will actually do.
+        """
+        at = _parse_ts(as_of)
+        at_dt = at or datetime.now(timezone.utc)
+        stated = self.repo.get_preferences(as_of=at, kind="stated", context=None)
+        revealed = self.repo.get_preferences(as_of=at, kind="revealed", context=None)
+        s = next((p for p in stated if p.topic == topic), None)
+        r = next((p for p in revealed if p.topic == topic), None)
+        if s is None or r is None:
+            return {"topic": topic, "status": "insufficient_data",
+                    "stated": s.stance if s else None, "revealed": r.stance if r else None}
+        aligned = s.stance == r.stance
+        return {
+            "topic": topic,
+            "aligned": aligned,
+            "stated": {"stance": s.stance, "strength": round(s.effective_strength(at_dt), 4)},
+            "revealed": {"stance": r.stance, "strength": round(r.effective_strength(at_dt), 4)},
+            "note": "acts consistently with stated preference"
+            if aligned else "behaviour diverges from stated preference",
+        }
+
+    def preference_history(self, topic: str, as_of: str | None = None) -> list[dict[str, Any]]:
+        """Return the log of how a preference has drifted over time."""
+        changes = self.repo.get_preference_changes(topic=topic, as_of=_parse_ts(as_of))
+        return [c.model_dump(mode="json") for c in changes]
 
     # --- analytics ------------------------------------------------------
     def forecast(self, metric: str, horizon_days: int = 7, as_of: str | None = None) -> dict[str, Any]:

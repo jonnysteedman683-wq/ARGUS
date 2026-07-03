@@ -11,7 +11,9 @@ def _dt(day: int) -> datetime:
 
 def _seed() -> Toolbox:
     repo = Repository("sqlite:///:memory:")
-    repo.set_preference(Preference(topic="meetings", stance="prefer async", strength=0.8, updated_at=_dt(1)))
+    repo.set_preference(
+        Preference(topic="meetings", stance="prefer async", strength=0.8, updated_at=_dt(1))
+    )
     repo.add_observation(Observation(ts=_dt(1), source="notes", kind="note", text="started project"))
     for day, val in [(1, 7.0), (2, 7.0), (3, 7.0), (4, 2.0), (5, 7.0)]:
         repo.add_metric(Metric(ts=_dt(day), name="sleep_hours", value=val))
@@ -45,3 +47,29 @@ def test_draft_action_never_executes():
     draft = tb.draft_action("email", {"to": "x@example.com", "body": "hi"})
     assert draft["status"] == "draft"
     assert draft["requires_confirmation"] is True
+
+
+def test_divergence_flags_stated_vs_revealed_gap():
+    tb = _seed()  # stated: prefer async
+    tb.set_preference("meetings", "books lots of meetings", kind="revealed")
+    d = tb.divergence("meetings")
+    assert d["aligned"] is False
+    assert d["stated"]["stance"] == "prefer async"
+    assert d["revealed"]["stance"] == "books lots of meetings"
+
+
+def test_contradiction_is_logged_not_overwritten():
+    tb = _seed()
+    tb.set_preference("meetings", "fine with meetings", kind="stated", reason="new job")
+    history = tb.preference_history("meetings")
+    assert len(history) == 1
+    assert history[0]["old_stance"] == "prefer async"
+    assert history[0]["new_stance"] == "fine with meetings"
+
+
+def test_preference_strength_decays_over_time():
+    tb = _seed()  # stated pref set at 2026-06-01 with strength 0.8, half-life 180d
+    now = tb.list_preferences(kind="stated", as_of=_dt(1).isoformat())[0]
+    later = tb.list_preferences(kind="stated", as_of="2026-12-01T12:00:00Z")[0]
+    assert now["effective_strength"] == 0.8
+    assert later["effective_strength"] < 0.8  # ~half-life elapsed

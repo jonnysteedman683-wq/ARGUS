@@ -77,6 +77,42 @@ class TwinAgent:
             return tb.record_observation(text, source=source, kind=kind)
 
         @beta_tool
+        def set_preference(
+            topic: str, stance: str, kind: str = "stated", context: str | None = None,
+        ) -> dict:
+            """Record a preference. Use kind='stated' for what the person says they
+            prefer, kind='revealed' for what their behaviour implies.
+
+            Args:
+                topic: What the preference is about, e.g. "meetings".
+                stance: The preference, e.g. "prefer async".
+                kind: "stated" or "revealed".
+                context: Optional scope, e.g. "design_review", "weekday".
+            """
+            return tb.set_preference(topic, stance, kind=kind, context=context)
+
+        @beta_tool
+        def list_preferences(kind: str | None = None, as_of: str | None = None) -> list:
+            """List current preferences with time-decayed effective strength.
+
+            Args:
+                kind: Optional filter, "stated" or "revealed".
+                as_of: Optional ISO-8601 timestamp bound.
+            """
+            return tb.list_preferences(kind=kind, as_of=as_of)
+
+        @beta_tool
+        def divergence(topic: str, as_of: str | None = None) -> dict:
+            """Compare stated vs revealed preference for a topic — the gap between
+            what the person says and what they do.
+
+            Args:
+                topic: The preference topic to compare.
+                as_of: Optional ISO-8601 timestamp bound.
+            """
+            return tb.divergence(topic, as_of=as_of)
+
+        @beta_tool
         def forecast(metric: str, horizon_days: int = 7) -> dict:
             """Project a metric forward with a naive trend.
 
@@ -108,7 +144,8 @@ class TwinAgent:
 
         return [
             query_state, get_profile, search_observations, query_timeseries,
-            record_observation, forecast, detect_anomalies, draft_action,
+            record_observation, set_preference, list_preferences, divergence,
+            forecast, detect_anomalies, draft_action,
         ]
 
     def ask(self, message: str) -> str:
