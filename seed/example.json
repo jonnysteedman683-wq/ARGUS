@@ -1,0 +1,20 @@
+{
+  "observations": [
+    {"ts": "2026-06-01T09:00:00Z", "source": "notes", "kind": "note",
+     "text": "Kicked off the ARGUS digital-twin project."},
+    {"ts": "2026-06-10T14:30:00Z", "source": "calendar", "kind": "event",
+     "text": "Design review with the platform team.",
+     "content": {"attendees": 4, "duration_min": 60}},
+    {"ts": "2026-06-20T20:00:00Z", "source": "notes", "kind": "note",
+     "text": "Decided to prefer async written updates over status meetings."}
+  ],
+  "metrics": [
+    {"ts": "2026-06-01T07:00:00Z", "name": "sleep_hours", "value": 7.5, "unit": "h"},
+    {"ts": "2026-06-02T07:00:00Z", "name": "sleep_hours", "value": 7.1, "unit": "h"},
+    {"ts": "2026-06-03T07:00:00Z", "name": "sleep_hours", "value": 6.8, "unit": "h"},
+    {"ts": "2026-06-04T07:00:00Z", "name": "sleep_hours", "value": 4.2, "unit": "h"},
+    {"ts": "2026-06-05T07:00:00Z", "name": "sleep_hours", "value": 7.0, "unit": "h"},
+    {"ts": "2026-06-06T07:00:00Z", "name": "focus_hours", "value": 3.0, "unit": "h"},
+    {"ts": "2026-06-07T07:00:00Z", "name": "focus_hours", "value": 4.5, "unit": "h"}
+  ]
+}
